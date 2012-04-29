@@ -1,4 +1,5 @@
-# Introduction
+Introduction
+============
 
 Ether is an SCGI library for Ada.
 
@@ -7,7 +8,8 @@ library. Now placed into it's own repository for anyone to use.
 
 I have built this on the Debian testing.
 
-# Prerequisites
+Prerequisites
+=============
 
 * GNAT including gnatmake
 * AWS
