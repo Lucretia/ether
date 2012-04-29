@@ -1,0 +1,15 @@
+with "aws.gpr";
+with "templates_parser.gpr";
+with "xmlada.gpr";
+
+library project Ether_Lib is
+   for Source_Dirs  use ("src");
+   for Library_Name use "ether";
+   for Library_Kind use "static";
+   for Object_Dir   use "obj";
+   for Library_Dir  use "lib";
+
+   package Compiler is
+      for Switches ("Ada") use ("-g");
+   end Compiler;
+end ether_Lib;
