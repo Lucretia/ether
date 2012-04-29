@@ -13,10 +13,9 @@ package body Ether.Responses is
    CRLF : constant String := (L1.CR, L1.LF);
 
    procedure Send
-     (--Object  : in out Response;
-      Output    : in GNAT.Sockets.Stream_Access;
-      Status    : in AWS.Messages.Status_Code; --  HTTP.Status_Codes;
-      Mime_type : in String; --  MIME.Mime_Type;
+     (Output    : in GNAT.Sockets.Stream_Access;
+      Status    : in AWS.Messages.Status_Code;
+      Mime_type : in String;
       Content   : in String) is
    begin
       -- TODO: Check to make sure that there is no body for response codes:
@@ -26,8 +25,8 @@ package body Ether.Responses is
 --      Object := Request'(Status => Status, Mime => Mime, Content => Content);
       String'Write
         (Output,
-         "Status: " & AWS.Messages.Image(Status) & CRLF &  --  HTTP.Image(Status) & CRLF &
-         "Content-Type: " & Mime_Type & CRLF & --  MIME.Get_Mime(Mime_Type) & CRLF &
+         "Status: " & AWS.Messages.Image(Status) & CRLF &
+         "Content-Type: " & Mime_Type & CRLF &
          CRLF &
          Content);
 

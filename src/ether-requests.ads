@@ -7,8 +7,6 @@ with Ada.Strings.Hash;
 with Ada.Containers.Indefinite_Hashed_Maps;
 with Ada.Strings.Unbounded;
 with GNAT.Sockets;
---with Unicode;
---with URIs;
 with Unicode.CES;
 
 package Ether.Requests is
