@@ -13,5 +13,6 @@ package Ether.Responses is
      (Output    : in GNAT.Sockets.Stream_Access;
       Status    : in AWS.Messages.Status_Code;
       Mime_Type : in String;
-      Content   : in String); --  TODO: This should be a Unicode string.
+      Content   : in String; --  TODO: This should be a Unicode string.
+      Char_Set  : in String := "UTF-8");
 end Ether.Responses;

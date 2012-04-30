@@ -6,9 +6,13 @@
 
 with Ada.Characters.Latin_1;
 --with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Strings.Unbounded;
 
 package body Ether.Responses is
-   package L1 renames  Ada.Characters.Latin_1;
+   package L1 renames Ada.Characters.Latin_1;
+   package US renames Ada.Strings.Unbounded;
+   
+   use type US.Unbounded_String;
 
    CRLF : constant String := (L1.CR, L1.LF);
 
@@ -16,8 +20,17 @@ package body Ether.Responses is
      (Output    : in GNAT.Sockets.Stream_Access;
       Status    : in AWS.Messages.Status_Code;
       Mime_type : in String;
-      Content   : in String) is
+      Content   : in String;
+      Char_Set  : in String := "UTF-8") is
+      
+      Actual_Char_Set : US.Unbounded_String := US.To_Unbounded_String("; charset=");
    begin
+      if Char_Set = "" then
+	 Actual_Char_Set := US.Null_Unbounded_String;
+      else
+	 Actual_Char_Set := Actual_Char_Set & Char_Set;
+      end if;
+      
       -- TODO: Check to make sure that there is no body for response codes:
       --       1xx, 204, 304, raise an exception if it does. See S.4.3 of
       --       RFC2616.
@@ -26,7 +39,7 @@ package body Ether.Responses is
       String'Write
         (Output,
          "Status: " & AWS.Messages.Image(Status) & CRLF &
-         "Content-Type: " & Mime_Type & CRLF &
+         "Content-Type: " & Mime_Type & US.To_String(Actual_Char_Set) & CRLF &
          CRLF &
          Content);
 
