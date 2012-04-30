@@ -259,7 +259,8 @@ package body Ether.Requests is
    begin
       --  If we get no length, there's a problem!
       if L = "" then
-         raise Request_Error;
+         raise Request_Error
+	   with "[Ether] No content length defined.";
       end if;
 
       return Natural'Value(L);
