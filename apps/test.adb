@@ -23,16 +23,35 @@ procedure Test is
    Request       : Ether.Requests.Request;
 
    User_Login    : String :=
+     "<!DOCTYPE HTML PUBLIC ""-//W3C//DTD HTML 4.01//EN""" & CRLF &
+     """http://www.w3.org/TR/html4/strict.Dtd"">" & CRLF &
      "<html>" & CRLF &
      "  <head>" & CRLF &
      "    <title>User Login</title>" & CRLF &
      "  </head>" & CRLF &
      "  <body>" & CRLF &
      "    <h1>User Login</h1>" & CRLF &
-     "    <form method=""post"" accept-charset=""UTF-8"" enctype=""multipart/form-data"">" & CRLF &
+     "    <form method=""post"" accept-charset=""UTF-8"" enctype=""multipart/form-data"" action=""/user"">" & CRLF &
      "      <p><label>Username: <input name=""username""></label></p>" & CRLF &
      "      <p><label>Password: <input name=""password""></label></p>" & CRLF &
-     "      <p><label>Filename: <input type=""File"" name=""filename""></lable></p>" & CRLF &
+     "      <p><label>Filename: <input type=""File"" name=""filename""></label></p>" & CRLF &
+     "      <p><button type=""submit"">Send</button></p>" & CRLF &
+     "    </form>" & CRLF &
+     "  </body>" & CRLF &
+     "</html>" & CRLF;
+   
+   Simple_Login  : String :=
+     "<!DOCTYPE HTML PUBLIC ""-//W3C//DTD HTML 4.01//EN""" & CRLF &
+     """http://www.w3.org/TR/html4/strict.Dtd"">" & CRLF &
+     "<html>" & CRLF &
+     "  <head>" & CRLF &
+     "    <title>User Login</title>" & CRLF &
+     "  </head>" & CRLF &
+     "  <body>" & CRLF &
+     "    <h1>User Login</h1>" & CRLF &
+     "    <form method=""post"" accept-charset=""UTF-8"" enctype=""application/x-www-form-urlencoded"" action=""/simple"">" & CRLF &
+     "      <p><label>Username: <input name=""username""></label></p>" & CRLF &
+     "      <p><label>Password: <input name=""password""></label></p>" & CRLF &
      "      <p><button type=""submit"">Send</button></p>" & CRLF &
      "    </form>" & CRLF &
      "  </body>" & CRLF &
@@ -96,13 +115,13 @@ begin
                Ether.Requests.Content_Type);
       begin
          --  TODO: URI's should be grabbed from the database.
-         if URI = "/" then
-            if Content_Type = AWS.MIME.Application_Form_Data then
+         if URI = "/user" then
+            if Content_Type = AWS.MIME.Multipart_Form_Data then
                Ether.Responses.Send
                  (Output    => Channel,
                   Status    => AWS.Messages.S200,
                   Mime_Type => AWS.MIME.Text_Plain,
-                  Content   => "Hello");
+                  Content   => "Sent multipart data");
             else
                Ether.Responses.Send
                  (Output    => Channel,
@@ -110,12 +129,32 @@ begin
                   Mime_Type => AWS.MIME.Text_HTML,
                   Content   => User_Login);
             end if;
+         elsif URI = "/simple" then
+            if Content_Type = AWS.MIME.Application_Form_Data then
+               Ether.Responses.Send
+                 (Output    => Channel,
+                  Status    => AWS.Messages.S200,
+                  Mime_Type => AWS.MIME.Text_Plain,
+                  Content   => "Sent form data");
+            else
+               Ether.Responses.Send
+                 (Output    => Channel,
+                  Status    => AWS.Messages.S200,
+                  Mime_Type => AWS.MIME.Text_HTML,
+                  Content   => Simple_Login);
+            end if;
+         elsif URI = "/test" then
+	    Ether.Responses.Send
+	      (Output    => Channel,
+	       Status    => AWS.Messages.S200,
+	       Mime_Type => AWS.MIME.Text_HTML,
+	       Content   => "Form sent OK");
          else
             Ether.Responses.Send
               (Output    => Channel,
                Status    => AWS.Messages.S200,
                Mime_Type => AWS.MIME.Text_Plain,
-               Content   => "हिन्दी समाचार");
+               Content   => "hello" & CRLF & "हिन्दी समाचार");
          end if;
       exception
          --  TODO: Send actual error pages here.
