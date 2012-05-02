@@ -10,6 +10,8 @@ with Ether.Responses;
 with AWS.Messages;
 with AWS.MIME;
 
+use type Ether.Requests.Form_Data_Method;
+
 procedure Test is
    package L renames Ada.Characters.Latin_1;
 --   use type MIME.Mime_Type;
@@ -22,7 +24,24 @@ procedure Test is
    Channel       : GNAT.Sockets.Stream_Access;
    Request       : Ether.Requests.Request;
 
-   User_Login    : String :=
+   Get_Login    : String :=
+     "<!DOCTYPE HTML PUBLIC ""-//W3C//DTD HTML 4.01//EN""" & CRLF &
+     """http://www.w3.org/TR/html4/strict.Dtd"">" & CRLF &
+     "<html>" & CRLF &
+     "  <head>" & CRLF &
+     "    <title>User Login - GET</title>" & CRLF &
+     "  </head>" & CRLF &
+     "  <body>" & CRLF &
+     "    <h1>User Login</h1>" & CRLF &
+     "    <form method=""get"" accept-charset=""UTF-32"" enctype=""multipart/form-data"" action=""/get"">" & CRLF &
+     "      <p><label>Username: <input name=""username㋕""></label></p>" & CRLF &
+     "      <p><label>Password: <input name=""password""></label></p>" & CRLF &
+     "      <p><button type=""submit"">Send</button></p>" & CRLF &
+     "    </form>" & CRLF &
+     "  </body>" & CRLF &
+     "</html>" & CRLF;
+   
+   Put_User_Login    : String :=
      "<!DOCTYPE HTML PUBLIC ""-//W3C//DTD HTML 4.01//EN""" & CRLF &
      """http://www.w3.org/TR/html4/strict.Dtd"">" & CRLF &
      "<html>" & CRLF &
@@ -31,16 +50,16 @@ procedure Test is
      "  </head>" & CRLF &
      "  <body>" & CRLF &
      "    <h1>User Login</h1>" & CRLF &
-     "    <form method=""post"" accept-charset=""UTF-8"" enctype=""multipart/form-data"" action=""/user"">" & CRLF &
+     "    <form method=""post"" accept-charset=""UTF-32"" enctype=""multipart/form-data"" action=""/user"">" & CRLF &
      "      <p><label>Username: <input name=""username""></label></p>" & CRLF &
      "      <p><label>Password: <input name=""password""></label></p>" & CRLF &
-     "      <p><label>Filename: <input type=""File"" name=""filename""></label></p>" & CRLF &
+     "      <p><label>Filename: <input type=""File"" name=""filename"" multiple=""true""></label></p>" & CRLF &
      "      <p><button type=""submit"">Send</button></p>" & CRLF &
      "    </form>" & CRLF &
      "  </body>" & CRLF &
      "</html>" & CRLF;
    
-   Simple_Login  : String :=
+   Put_Simple_Login  : String :=
      "<!DOCTYPE HTML PUBLIC ""-//W3C//DTD HTML 4.01//EN""" & CRLF &
      """http://www.w3.org/TR/html4/strict.Dtd"">" & CRLF &
      "<html>" & CRLF &
@@ -106,49 +125,73 @@ begin
       end if;
 	 
       declare
-         URI          : String := Ether.Requests.Value
+         --  URI          : String := Ether.Requests.Value
+         --    (Request,
+         --     Ether.Requests.Request_URI);
+
+         Script_Name  : String := Ether.Requests.Value
            (Request,
-            Ether.Requests.Request_URI);
+            Ether.Requests.Script_Name);
 
          Content_Type : String := Ether.Requests.Value
               (Request,
                Ether.Requests.Content_Type);
       begin
          --  TODO: URI's should be grabbed from the database.
-         if URI = "/user" then
-            if Content_Type = AWS.MIME.Multipart_Form_Data then
-               Ether.Responses.Send
-                 (Output    => Channel,
-                  Status    => AWS.Messages.S200,
-                  Mime_Type => AWS.MIME.Text_Plain,
-                  Content   => "Sent multipart data");
-            else
-               Ether.Responses.Send
-                 (Output    => Channel,
-                  Status    => AWS.Messages.S200,
-                  Mime_Type => AWS.MIME.Text_HTML,
-                  Content   => User_Login);
-            end if;
-         elsif URI = "/simple" then
+         if Script_Name = "/get" then
+	    if Ether.Requests.Form_Data_Method_Is (Request) = Ether.Requests.Get then
+	       if Ether.Requests.Value(Request, Ether.Requests.HTTP_Referer) = "" then
+		  Ether.Responses.Send
+		    (Output    => Channel,
+		     Status    => AWS.Messages.S200,
+		     Mime_Type => AWS.MIME.Text_HTML,
+		     Content   => Get_Login);
+	       else
+		  Ether.Responses.Send
+		    (Output    => Channel,
+		     Status    => AWS.Messages.S200,
+		     Mime_Type => AWS.MIME.Text_Plain,
+		     Content   => "Sent form data via GET");
+	       end if;
+	    end if;
+         elsif Script_Name = "/user" then
+            if Ether.Requests.Content_Length (Request) /= 0 then
+	       if Content_Type(Content_Type'First ..  AWS.MIME.Multipart_Form_Data'Last) =
+		 AWS.MIME.Multipart_Form_Data then
+	       
+		  Ether.Responses.Send
+		    (Output    => Channel,
+		     Status    => AWS.Messages.S200,
+		     Mime_Type => AWS.MIME.Text_Plain,
+		     Content   => "Sent multipart data via PUT");
+	       end if;
+	    else
+	       Ether.Responses.Send
+		 (Output    => Channel,
+		  Status    => AWS.Messages.S200,
+		  Mime_Type => AWS.MIME.Text_HTML,
+		  Content   => Put_User_Login);
+	    end if;
+         elsif Script_Name = "/simple" then
             if Content_Type = AWS.MIME.Application_Form_Data then
                Ether.Responses.Send
                  (Output    => Channel,
                   Status    => AWS.Messages.S200,
                   Mime_Type => AWS.MIME.Text_Plain,
-                  Content   => "Sent form data");
+                  Content   => "Sent form data via PUT");
             else
                Ether.Responses.Send
                  (Output    => Channel,
                   Status    => AWS.Messages.S200,
                   Mime_Type => AWS.MIME.Text_HTML,
-                  Content   => Simple_Login);
+                  Content   => Put_Simple_Login);
             end if;
-         elsif URI = "/test" then
-	    Ether.Responses.Send
-	      (Output    => Channel,
-	       Status    => AWS.Messages.S200,
-	       Mime_Type => AWS.MIME.Text_HTML,
-	       Content   => "Form sent OK");
+         --  elsif Script_Name = "/test" then
+	 --     Ether.Responses.Send
+	 --       (Output    => Channel,
+	 --        Status    => AWS.Messages.S200,
+	 --        Mime_Type => AWS.MIME.Text_HTML,
+	 --        Content   => "Form sent OK via PUT");
          else
             Ether.Responses.Send
               (Output    => Channel,
