@@ -33,10 +33,22 @@ procedure Test is
      "  </head>" & CRLF &
      "  <body>" & CRLF &
      "    <h1>User Login</h1>" & CRLF &
-     "    <form method=""get"" accept-charset=""UTF-32"" enctype=""multipart/form-data"" action=""/get"">" & CRLF &
-     "      <p><label>Username: <input name=""username㋕""></label></p>" & CRLF &
-     "      <p><label>Password: <input name=""password""></label></p>" & CRLF &
-     "      <p><button type=""submit"">Send</button></p>" & CRLF &
+     "    <form method=""get"" accept-charset=""UTF-8"" enctype=""multipart/form-data"" action=""/get"">" & CRLF &
+     "      <p><label>Username : <input name=""username""></label></p>" & CRLF &
+     "      <p><label>Password : <input name=""password"" type=""password""></label></p>" & CRLF &
+     "      <p><label>Subscribe: <input name=""Subscribe"" type=""checkbox"" value=""Yes"" checked></label></p>" & CRLF &
+     "      <p>" & CRLF &
+     "        <label for=""banana"">Banana</label>" & CRLF &
+     "        <input name=""fruit"" type=""radio"" value=""Banana"" id=""banana"" checked>" & CRLF &
+     "        <label for=""orange"">Orange</label>" & CRLF &
+     "        <input name=""fruit"" type=""radio"" value=""Orange"" id=""orange"">" & CRLF &
+     "        <label for=""mango"">Mango</label>" & CRLF &
+     "        <input name=""fruit"" type=""radio"" value=""Mango"" id=""mango"">" & CRLF &
+     "      </p>" & CRLF &
+     "      <p>" & CRLF &
+     "        <button type=""submit"">Send</button>" & CRLF &
+     "        <button type=""reset"">Reset</button>" & CRLF &
+     "    </p>" & CRLF &
      "    </form>" & CRLF &
      "  </body>" & CRLF &
      "</html>" & CRLF;
