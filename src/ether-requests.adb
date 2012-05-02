@@ -6,6 +6,7 @@
 with Ada.Characters.Latin_1;
 with Ada.Text_IO; use Ada.Text_IO;
 with AWS.MIME;
+with Ether.Forms;
 
 package body Ether.Requests is
    procedure Receive
@@ -146,7 +147,14 @@ package body Ether.Requests is
       L : Integer := 0;
    begin
       Read_Environment(Object, Input);
-
+      
+      --  We read in the form data, if there is any, from a urlencoded string.
+      if Form_Data_Method_Is (Object) = Get then
+	 Ether.Forms.Decode_Query (Value (Object, Query_String));
+      else
+	 null;
+      end if;
+      
       --  TODO: Read in any form data and store them in the request
       --  object as well. Does this mean we don't need the Read_Content?
       --  Read_Form(Object.Form, Input);
@@ -267,6 +275,16 @@ package body Ether.Requests is
    end Content_Length;
 
 
+   function Form_Data_Method_Is (Object : in Request) return Form_Data_Method is
+   begin
+      if Content_Length(Object) = 0 and Value(Object, Request_Method) = "GET" then
+	 return Get;
+      end if;
+      
+      return Put;
+   end Form_Data_Method_Is;
+   
+   
    function Hash(Key : Header) return Ada.Containers.Hash_Type is
    begin
       return Ada.Strings.Hash(Header'Image(Key));

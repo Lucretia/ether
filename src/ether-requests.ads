@@ -47,6 +47,8 @@ package Ether.Requests is
                    Server_Signature,
                    Server_Software,
                    SCGI);
+   
+   type Form_Data_Method is (Get, Put);
 
    SCGI_Error    : exception;
    Request_Error : exception;
@@ -73,10 +75,12 @@ package Ether.Requests is
 
    function Content(Object : Request) return
      Ada.Strings.Unbounded.Unbounded_String;
-
+   
    --  Get the length of the content.
    --  Raises Request_Error.
    function Content_Length(Object : Request) return Natural;
+
+   function Form_Data_Method_Is (Object : in Request) return Form_Data_Method;
 
 private
    package US renames Ada.Strings.Unbounded;
