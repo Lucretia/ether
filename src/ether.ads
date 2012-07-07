@@ -6,6 +6,8 @@
 with Ada.Strings.Unbounded;
 
 package Ether is
+   Initialisation_Error : exception;
+
    --  Initialise the library with the max umber of bytes a request can have as content-type
    --  and the library's upload directory, i.e. where to save files to.
    procedure Initialise

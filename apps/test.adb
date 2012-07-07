@@ -9,7 +9,6 @@ with Ether.Requests;
 with Ether.Responses;
 with AWS.Messages;
 with AWS.MIME;
-with Ada.Directories;
 
 use type Ether.Requests.Form_Data_Method;
 
@@ -253,7 +252,7 @@ begin
 
    Close_Socket(Server_Socket);
 exception
-   when Ada.Directories.Name_Error =>
+   when Ether.Initialisation_Error =>
       --  No sockets to close here so will raise a different exception which is confusing,
       --  so we catch the name_error here and re-raise it so we get the correct error.
       raise;

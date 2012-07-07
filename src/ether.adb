@@ -22,11 +22,11 @@ package body Ether is
             Temps       := US.To_Unbounded_String (Temp_Dir);
             Initialised := True;
          else
-            raise Dirs.Name_Error with
+            raise Initialisation_Error with
               "[Ether] Temporary directory """ & Temp_Dir & """ does not exist!";
          end if;
       else
-         raise Dirs.Name_Error with
+         raise Initialisation_Error with
            "[Ether] Upload directory """ & Upload_Dir & """ does not exist!";
       end if;
    end Initialise;
