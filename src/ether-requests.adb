@@ -5,6 +5,8 @@
 --  Created On      : Sun Jul  4 19:11:27 2010
 with Ada.Characters.Latin_1;
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Unchecked_Deallocation;
+with Ada.Unchecked_Conversion;
 with AWS.MIME;
 with Ether.Forms;
 
@@ -115,86 +117,409 @@ package body Ether.Requests is
          end Read_Net_String;
       end Read_Environment;
 
-
+      
+      function Find_Boundary (Object : in Request) return String is
+	 Data     : String          := Value (Object, Content_Type);
+	 Index    : Positive        := Positive'First;
+	 Boundary : constant String := "boundary=";
+      begin
+	 --  find "boundary="
+	 while Index /= Data'Length loop
+	    exit when Data (Index) = ';';
+	    
+	    Index := Index + 1;
+	 end loop;
+	 
+	 --  Have not found the ; and therefore not a multipart!
+	 if Index = Data'Length then
+	    raise SCGI_Error
+	      with "[Ether] Content has no multipart data within, boundary not present.";
+	 end if;
+	 
+	 --  Skip past the ';'
+	 
+	 Index := Index + 1;
+	 
+	 if Data (Index) = ' ' then
+	    -- Skip past the space.
+	    Index := Index + 1;
+	    
+	    -- We need to make sure we find the boundary marker.
+	    if Data'Length - Index < Boundary'Length then
+	       raise SCGI_Error
+		 with "[Ether] Content has no multipart data within, ""boundary="" not found.";
+	    end if;
+	    
+	    --  The remainder of the string is our boundary.
+	    if Data (Index .. Index + Boundary'Length - 1) = Boundary then
+	       return Data (Index + Boundary'Length .. Data'Length);
+	    end if;
+	 end if;
+	 
+	 --  Should never get here!
+	 return "";
+      end Find_Boundary;
+      
       -------------------------------------------------------------------------
       --  This is the data that follows the NetString, if there is any; usually
       --  form data.
-      function Read_Content
-        (Input  : GNAT.Sockets.Stream_Access;
-         Length : Integer) return US.Unbounded_String is
+      --  function Read_Content
+      --    (Input  : GNAT.Sockets.Stream_Access;
+      --     Length : Integer) return US.Unbounded_String is
 
-         L           : AS.Stream_Element_Offset := AS.Stream_Element_Offset(Length);
+      --     L           : AS.Stream_Element_Offset := AS.Stream_Element_Offset(Length);
+      --     Actual_Read : AS.Stream_Element_Offset;
+      --     Total_Read  : AS.Stream_Element_Offset := 1;
+      --     Message     : AS.Stream_Element_Array(1 .. L);
+      --     Result      : String(1 .. Length);
+      --  begin
+      --     --  Just in case it won't read the content in 1 chunk.
+      --     while Total_Read < L loop
+      --        AS.Read(Input.all, Message(Total_Read .. L), Actual_Read);
+
+      --        Total_Read := Total_Read + Actual_Read;
+      --     end loop;
+
+      --     -- Convert the stream elements into characters that we can display.
+      --     for Count in Message'Range loop
+      --        Result(Integer(Count)) := Character'Val(Message(Count));
+      --     end loop;
+
+      --     return US.To_Unbounded_String(Result);
+      --  end Read_Content;
+      
+      type Stream_Element_Array_Access is access AS.Stream_Element_Array;
+      
+      procedure Read_Content
+        (Input   : in     GNAT.Sockets.Stream_Access;
+	 Content : in out Stream_Element_Array_Access) is
+
+         L           : AS.Stream_Element_Offset := Content.all'Length;
          Actual_Read : AS.Stream_Element_Offset;
          Total_Read  : AS.Stream_Element_Offset := 1;
-         Message     : AS.Stream_Element_Array(1 .. L);
-         Result      : String(1 .. Length);
       begin
          --  Just in case it won't read the content in 1 chunk.
          while Total_Read < L loop
-            AS.Read(Input.all, Message(Total_Read .. L), Actual_Read);
+            AS.Read(Input.all, Content.all (Total_Read .. L), Actual_Read);
 
             Total_Read := Total_Read + Actual_Read;
          end loop;
-
-         -- Convert the stream elements into characters that we can display.
-         for Count in Message'Range loop
-            Result(Integer(Count)) := Character'Val(Message(Count));
-         end loop;
-
-         return US.To_Unbounded_String(Result);
       end Read_Content;
+      
+      procedure Free is new Ada.Unchecked_Deallocation
+	(Object => AS.Stream_Element_Array,
+	 Name   => Stream_Element_Array_Access);
+      
+      function To_Stream_Element_Array (Data : in String) return AS.Stream_Element_Array is
+	 R : AS.Stream_Element_Array (1 .. Data'Length);
+      begin
+	 for Index in Data'Range loop
+	    R (AS.Stream_Element_Offset (Index)) := AS.Stream_Element (Character'Pos (Data (Index)));
+	 end loop;
+	 
+	 return R;
+      end To_Stream_Element_Array;
+	 
+      function To_String (Data : in AS.Stream_Element_Array) return String is
+	 Current : Positive := Positive'First;
+	 R       : String (Current .. Data'Length);
+      begin
+	 for Index in Data'Range loop
+	    R (Current) := Character'Val (Data (Index));
+	    
+	    Current := Current + 1;
+	 end loop;
+	 
+	 return R;
+      end To_String;
+      
+      function Matches (Data : in AS.Stream_Element_Array; Match : in String) return Boolean is
+	 Test : String := 
+	   To_String (Data (Data'First .. Data'First + AS.Stream_Element_Offset (Match'Length) - 1));
+      begin
+	 if Test = Match then
+	    return True;
+	 end if;
+	 
+	 return False;
+      end Matches;
+      
+      --  Find the index of the next CRLF pair in a string.
+      function Find_CRLF (Data : in String) return Positive is
+	 Index : Positive := Data'First;
+      begin
+	 while Index /= Data'Last - 1 loop
+	    if Data (Index) = L1.CR and Data (Index + 1) = L1.LF then
+	       return Index;
+	    end if;
+	    
+	    Index := Index + 1;
+	 end loop;
+	 
+	 return Positive'Last;
+      end Find_CRLF;
+      
+      --  Find Key within Data, then return whatever is in quotes, i.e. <key>="<value>"
+      procedure Find_Value (Data : in String; Key : in String; Value : out US.Unbounded_String; Last_Index : out Positive) is
+	 Index : Positive := Data'First;
+	 First : Positive := Positive'First;
+	 Last  : Positive := Positive'First;
+      begin
+	 --  Obviously a fail.
+	 if Data = "" then
+	    Last_Index := Positive'Last;
+	    Value      := US.Null_Unbounded_String;
+	    
+	    return;
+	 end if;
+	 
+	 while Index /= Data'Last - Key'Length loop
+	    if Data (Index .. Index + Key'Length - 1) = Key then
+	       --  The first character after the '="' marker.
+	       First := Index + Key'Length + 2;
+	       
+	       --  Then find where the terminating quote is.
+	       for Count in First .. Data'Last loop
+		  if Data (Count) = L1.Quotation then
+		     Last := Count - 1;
+		     
+		     exit;
+		  end if;
+	       end loop;
+	       
+	       --  Skip past the "
+	       Last_Index := Last + 2;
+	       
+	       Value := US.To_Unbounded_String (Data (First .. Last));
+	       
+	       return;
+	    else
+	       Index := Index + 1;
+	    end if;
+	 end loop;
+	 
+	 Last_Index := Positive'Last;
+	 Value      := US.Null_Unbounded_String;
+      end Find_Value;
+      
+      --  Matches a string within a stream up until a CRLF pair.
+      procedure Is_In
+	(Data     : in     AS.Stream_Element_Array;
+	 Match    : in     String;
+	 Includes :    out Boolean;
+	 At_Index :    out Positive) is
+	 
+	 Test     : String :=
+	   To_String (Data (Data'First .. Data'First + AS.Stream_Element_Offset (Match'Length)));
+	 CRLF_Pos : Positive := Find_CRLF (Test);
+	 Index    : Positive := Positive'First;
+      begin
+	 --  Should never get here, unless the stream is just wrong.
+	 if CRLF_Pos = Positive'Last then
+	    raise SCGI_Error
+	      with "[Ether] No CRLF pair found in current stream.";
+	 end if;
 
-      L : Integer := 0;
+	 while AS.Stream_Element_Offset (Index) /= Data'Last - AS.Stream_Element_Offset (Match'Length) loop
+	    if Test (Index .. Match'Length) = Match then
+	       At_Index := Index;
+	       Includes := True;
+	       
+	       exit;
+	    end if;
+	 end loop;
+	 
+	 At_Index := Positive'Last;
+	 Includes := False;
+      end Is_In;
+      
+      Content_Disposition : constant String := "Content-Disposition";
+      Form_Data           : constant String := "form-data";
+      Name                : constant String := "name";
+      Filename            : constant String := "filename";
+      
+      L          : Integer  := 0;
+      Index      : Positive := Positive'First;
+      Chunk_Size : Positive := Positive'First;
    begin
       Read_Environment(Object, Input);
       
-      --  We read in the form data, if there is any, from a urlencoded string.
+      --  We read in the form data, if there is any...
       if Form_Data_Method_Is (Object) = Get then
+	 --  from a urlencoded string.
 	 Ether.Forms.Decode_Query (Value (Object, Query_String));
       else
-	 null;
-      end if;
-      
-      --  TODO: Read in any form data and store them in the request
-      --  object as well. Does this mean we don't need the Read_Content?
-      --  Read_Form(Object.Form, Input);
+	 --  from multipart/form-data content body.
+	 if Is_Valid(Object) then
+	    L := Content_Length(Object);
 
-      --  TODO: Form data can contain Unicode, how can this be handled?
-      --  i.e. हिन्दी is sent back as %26%232361%3B%26%232367%3B%26%232344%3B%26%232381%3B%26%232342%3B%26%232368%3B
+	    if L /= 0 then
+	       --  Only have a boundary if this is multipart.
+	       if Get_Content_Type (Object) = AWS.MIME.Multipart_Form_Data then
+		  declare
+		     Content      : Stream_Element_Array_Access := new AS.Stream_Element_Array
+		       (1 .. AS.Stream_Element_Offset (L));
+		     Boundary     : US.Unbounded_String         := US.To_Unbounded_String
+		       (Find_Boundary (Object));
+		     Current_Char : Character;
+		     Next_Char    : Character;
+		  begin
+		     Put_Line ("boundary = '" & US.To_String (Boundary) & "'");
+		     
+		     --  Temporarily read in the rest of the stream into memory.
+		     Read_Content (Input, Content);
+		     
+		     while Index /= Content'Length - 1 loop
+			Current_Char := Character'Val (Content (AS.Stream_Element_Offset (Index)));
+			Next_Char    := Character'Val (Content (AS.Stream_Element_Offset (Index + 1)));
+			
+			if Current_Char = L1.CR and Next_Char = L1.LF then
+			   Put_Line ("-- CRLF -- ");
+			   
+			   Index := Index + 2;
+			elsif Current_Char = L1.Hyphen and Next_Char = L1.Hyphen then
+			   if Index = Content'Length - 3 then
+			      --  This is the end marker of the stream which is "--CRLF".
+			      Put_Line ("## End of content ##");
+			      
+			      Index := Index + 2;
+			   elsif Content'Length - Index >= US.Length (Boundary) then
+			      --  Found the boundary marker.
+			      if To_String (Content (AS.Stream_Element_Offset (Index + 2) .. AS.Stream_Element_Offset (Index + 1 + US.Length (Boundary)))) = Boundary then
+				 Put_Line ("## Boundary ##");
+				 
+				 Index := Index + 2 + US.Length (Boundary);
+			      else
+				 raise SCGI_Error
+				   with "[Ether] Invalid boundary marker found within content.";
+			      end if;
+			   end if;
+			elsif Matches (Content (AS.Stream_Element_Offset (Index) .. Content'Last), Content_Disposition) then
+			   declare
+			      --  Get the position of the next line start, this will be the blank line before the form data.
+			      Next_Line : Positive := Find_CRLF
+				(To_String (Content (AS.Stream_Element_Offset (Index) .. Content'Last)));
+			      
+			      Name                 : US.Unbounded_String;
+			      Filename             : US.Unbounded_String;
+			      Index_After_Name     : Positive;
+			      Index_After_Filename : Positive;
+			   begin
+			      Find_Value
+				(Data       => To_String (Content (AS.Stream_Element_Offset (Index) + Content_Disposition'Length .. AS.Stream_Element_Offset (Index + Next_Line))),
+				 Key        => "name",
+				 Value      => Name,
+				 Last_Index => Index_After_Name);
+			      
+			      Find_Value
+				(Data       => To_String (Content (AS.Stream_Element_Offset (Index + Index_After_Name) .. AS.Stream_Element_Offset (Index + Next_Line))),
+				 Key        => "filename",
+				 Value      => Filename,
+				 Last_Index => Index_After_Filename);
+				  
+			      Put ("Form field '" & US.To_String (Name) & "' = '");
+			      
+			      --  Normal field data.
+			      --  Skip the next CRLF which indicates a blank line..
+			      declare
+				 Data_First : AS.Stream_Element_Offset := AS.Stream_Element_Offset (Index + Next_Line + 2);
+				 Data_Last  : AS.Stream_Element_Offset := AS.Stream_Element_Offset (Index + Find_CRLF (To_String (Content (Data_First .. Content'Last))));
+			      begin
+				 Put_Line (To_String (Content (Data_First .. Data_Last)) & "'");
+			      end;
+			      
+			      if Filename /= "" then
+				 --  Contents of a file.
+				 Put_Line ("Form field filename '" & US.To_String (Filename) & "' = '");
+				 
+				 Index := Index + Next_Line;
+			      end if;
+			      
+			      --  Skip to the next line.
+			      Index := Index + Positive (Next_Line) + 1;
+			   end;
+			      
+			   --  Find_CRLF after Content_Disposition, find "name" and/or "filename" getting
+			   --  their value's.
+			   
+			   --  declare
+			   --     First : AS.Stream_Element_Offset : AS.Strea_Element_Offset (Index + Content_Disposition'Length);
+			   --  begin
+			   --     if Matches (Content (First .. First + 1), ": ") then
+			   --  	--  Skip ": "
+			   --  	First := First + 2;
+				
+			   --  	if Matches (Content (First .. First + AS.Strea_Element_Offset (Form_Data'Length)), Form_Data) then
+			   --  	   --  Skip "form-data"
+			   --  	   First := First + AS.Strea_Element_Offset (Form_Data'Length);
+				   
+			   --  	   if Matches (Content (First .. First + 1), "; ") then
+			   --  	      -- Skip "; "
+			   --  	      First := First + 2;
+				      
+			   --  	      if Matches (Content (First .. First + AS.Strea_Element_Offset (Name'Length)), Name) then
+			   --  		 Put_Line
+			   --  		   ("Form field name: " &
+			   --  		      Content (AS.Strea_Element_Offset (Form_Data'Length) .. ));
+			   --  	      else
+			   --  		 raise SCGI_Error
+			   --  		   with "[Ether] Missing ""name"" after Content-Disposition in content.";
+			   --  	      end if;
+			   --  	   else
+			   --  	      raise SCGI_Error
+			   --  		with "[Ether] Missing ""; "" after form-data in Content-Disposition in content.";
+			   --  	   end if;
+			   --  	else
+			   --  	   raise SCGI_Error
+			   --  	     with "[Ether] Missing ""Form-Data"" after Content-Disposition in content.";
+			   --  	end if;
+			   --     else
+			   --  	 raise SCGI_Error
+			   --  	   with "[Ether] Missing "": "" after Content-Disposition in content.";
+			   --     end if;
+			   --  end;
+			else
+			   Put (Current_Char);
+			   
+			   Index := Index + 1;
+			end if;
+		     end loop;
+	       
+		     Free (Content);
+		  end;
+	       else
+		  declare
+		     Content : String (1 .. L);
+		  begin
+		     String'Read (Input, Content);
+		     
+		     Ether.Forms.Decode_Query (Content);
+		  end;
+	       end if;
+	       
+	       --  --  At this point, we know we have content after the headers. We
+	       --  --  just don't know what type it is.
+	       --  if Value(Object, Content_Type) = AWS.MIME.Application_Form_Data then
+	       --     --  URIs.Decode
+	       --     --    (Request => Value(Object, Request_URI),
+	       --     --     Path    =>,
+	       --     --     Params  => Form);
+	       --     null;
+	       --  elsif Value(Object, Content_Type) = AWS.MIME.Multipart_Form_Data then
+	       --     null;
+	       --  --  elsif Value(Object, Content_Type) = MIME.Get_Mime(MIME.Multipart_Digest) then
+	       --  --     null;
+	       --  --  elsif Value(Object, Content_Type) = MIME.Get_Mime(MIME.Multipart_Mixed) then
+	       --  else
+	       --     null;
+	       --  end if;
 
-      --  TODO: Check this outside of the request object, send back a bad request
-      --  response if something is wrong?
-      --
-      --  TODO: Object.Content most likely won't be required in future!
-      if Is_Valid(Object) then
-         L := Content_Length(Object);
-
-         if L = 0 then
-            --  At this point, there could be data passed in QUERY_STRING.
-            Object.Content := US.Null_Unbounded_String;
-         else
-            --  At this point, we know we have content after the headers. We
-            --  just don't know what type it is.
-            if Value(Object, Content_Type) = AWS.MIME.Application_Form_Data then
-               --  URIs.Decode
-               --    (Request => Value(Object, Request_URI),
-               --     Path    =>,
-               --     Params  => Form);
-               null;
-            elsif Value(Object, Content_Type) = AWS.MIME.Multipart_Form_Data then
-               null;
-            --  elsif Value(Object, Content_Type) = MIME.Get_Mime(MIME.Multipart_Digest) then
-            --     null;
-            --  elsif Value(Object, Content_Type) = MIME.Get_Mime(MIME.Multipart_Mixed) then
-            else
-               null;
-            end if;
-
-            Object.Content := Read_Content(Input, L);
-         end if;
-      else
-         raise Request_Error
-           with "[Ether] Non-SCGI request received.";
+	       --  Object.Content := Read_Content(Input, L);
+	    end if;
+	 else
+	    raise Request_Error
+	      with "[Ether] Non-SCGI request received.";
+	 end if;
       end if;
    end Receive;
 
@@ -203,7 +528,7 @@ package body Ether.Requests is
    begin
       Variable_Map.Clear(Object.Environment);
 
-      Object.Content := US.Null_Unbounded_String;
+      --  Object.Content := US.Null_Unbounded_String;
    end Clean;
 
 
@@ -255,11 +580,10 @@ package body Ether.Requests is
    end Form;
 
 
-   function Content(Object : Request) return
-     Ada.Strings.Unbounded.Unbounded_String is
-   begin
-      return Object.Content;
-   end Content;
+   --  function Content(Object : Request) return String is
+   --  begin
+   --     return Object.Content.all;
+   --  end Content;
 
 
    function Content_Length(Object : Request) return Natural is
@@ -275,6 +599,19 @@ package body Ether.Requests is
    end Content_Length;
 
 
+   function Get_Content_Type (Object : Request) return String is
+      C : String := Value (Object, Content_Type);
+   begin
+      if C = AWS.MIME.Application_Form_Data then
+	 return AWS.MIME.Application_Form_Data;
+      elsif C (1 .. AWS.MIME.Multipart_Form_Data'Length) = AWS.MIME.Multipart_Form_Data then
+	 return AWS.MIME.Multipart_Form_Data;
+      else
+	 raise SCGI_Error
+	   with "[Ether] Unknown Content-Type found.";
+      end if;
+   end Get_Content_Type;
+   
    function Form_Data_Method_Is (Object : in Request) return Form_Data_Method is
    begin
       if Content_Length(Object) = 0 and Value(Object, Request_Method) = "GET" then

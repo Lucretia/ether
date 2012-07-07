@@ -73,13 +73,14 @@ package Ether.Requests is
    function Cookie(Object : Request; Item : String) return String;
    function Form(Object : Request; Item : String) return Unicode.CES.Byte_Sequence;--Unicode.UTF8_String;
 
-   function Content(Object : Request) return
-     Ada.Strings.Unbounded.Unbounded_String;
+   --  function Content(Object : Request) return String;
    
    --  Get the length of the content.
    --  Raises Request_Error.
-   function Content_Length(Object : Request) return Natural;
-
+   function Content_Length (Object : Request) return Natural;
+   
+   function Get_Content_Type (Object : Request) return String;
+   
    function Form_Data_Method_Is (Object : in Request) return Form_Data_Method;
 
 private
@@ -107,13 +108,13 @@ private
       Hash            => Ada.Strings.Hash,
       Equivalent_Keys => Standard."=",
       "="             => Standard."=");
-
+   
    type Request is
       record
-         Environment : Variable_Map.Map       := Variable_Map.Empty_Map;
-         Cookies     : Cookie_Map.Map         := Cookie_Map.Empty_Map;
-         Form        : Form_Map.Map           := Form_Map.Empty_Map;
+         Environment  : Variable_Map.Map       := Variable_Map.Empty_Map;
+         Cookies      : Cookie_Map.Map         := Cookie_Map.Empty_Map;
+         Form         : Form_Map.Map           := Form_Map.Empty_Map;
          --  Form        : URIs.Parameter_Map.Map := URIs.Parameter_Map.Empty_Map;
-         Content     : US.Unbounded_String    := US.Null_Unbounded_String;
+         --  Content     : access Content_String  := "";
       end record;
 end Ether.Requests;
