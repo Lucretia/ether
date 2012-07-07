@@ -3,6 +3,7 @@
 --  Description     : Abstraction around the form data returned from the SCGI client (HTTP server).
 --  Author          : Luke A. Guest
 --  Created On      : Tue May  1 13:10:29 2012
+with GNAT.Sockets;
 with Unicode.CES;
 
 package Ether.Forms is
@@ -47,6 +48,7 @@ package Ether.Forms is
    Form_Error : exception;
    
    procedure Decode_Query (Data : in String);
+   procedure Decode_Content (Data : access String);
 --  private
    --  type Form is 
    --     null record

@@ -63,4 +63,17 @@ package body Ether.Forms is
 	 Value := US.Null_Unbounded_String;
       end if;
    end Decode_Query;
+   
+   procedure Decode_Content (Data : access String) is
+   begin
+      --  Find the boundary string from CONTENT_TYPE.
+      --  Each part starts with the boundary string, so for each part, read this in, 1 line.
+      --  Next line should be "Content-Disposition: ..."
+      --    Should contain "form-data;" followed by form field data, name and possible filename.
+      --    If there is a filename, the next line will be "Content-Type: ..."
+      --    Then follows field data or the file data.
+      
+      --  When searching for boundary, there are 2 dashes followed by the boundary marker.
+      null;
+   end Decode_Content;
 end Ether.Forms;
