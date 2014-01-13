@@ -14,3 +14,49 @@ Prerequisites
 * GNAT including gnatmake
 * AWS
 * XML/Ada
+
+Configuration of a server
+=========================
+
+Hosts
+-----
+
+127.0.1.1	www.testscgi.org testscgi.org
+
+Lighttpd
+--------
+
+In Debian testing:
+
+Create the following: /etc/lighttpd/conf-available/10-scgi.conf
+
+<start>
+# /usr/share/doc/lighttpd/scgi.txt
+# http://redmine.lighttpd.net/projects/lighttpd/wiki/Docs:ConfigurationOptions#mod_scgi-SCGI
+
+server.modules += ( "mod_scgi" )
+</end>
+
+sudo /usr/sbin/lighty-enable-mod scgi
+
+Add to the end of /etc/lighttpd/lighttpd.conf:
+
+<start>
+$HTTP["host"] =~ "(^|www\.)testscgi.org" {
+  server.document-root = "/home/laguest/public_html/testscgi.org"
+  server.errorlog = "/var/log/lighttpd/testscgi.org.error.log"
+  accesslog.filename = "/var/log/lighttpd/testscgi.org.access.log"
+
+  scgi.server = ( "/" =>
+    ( "127.0.1.1" =>
+      (
+        "host" => "127.0.1.1",
+        "port" => 4000,
+        "fix-root-scriptname" => "enable",
+        "check-local" => "disable"
+      )
+    )
+  )
+}
+<end>
+
