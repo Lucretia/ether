@@ -52,11 +52,11 @@ $HTTP["host"] =~ "(^|www\.)testscgi.org" {
       (
         "host" => "127.0.1.1",
         "port" => 4000,
-        "fix-root-scriptname" => "enable",
         "check-local" => "disable"
       )
     )
   )
 }
 <end>
+
 
